@@ -24,6 +24,10 @@
             <ul id="fileList"></ul>
             <button id="uploadBtn">Upload Files</button>
 
+            <!-- Daftar Klien Terhubung -->
+            <h4>Terhubung dengan:</h4>
+            <p id="connectedClients">Belum ada klien penerima terhubung.</p>
+
             <!-- Progress Bar -->
             <div id="progressContainer" style="display: none;">
                 <label>Progress: <span id="progressPercentage">0%</span></label><br>
@@ -33,17 +37,16 @@
 
             <!-- Uploaded Files for the Sender -->
             <h4>Uploaded Files:</h4>
-            <ul id="uploadedFilesListSender"></ul> <!-- Uploaded files list for sender -->
+            <ul id="uploadedFilesListSender"></ul>
         </div>
 
         <!-- Client Penerima -->
         <div id="receiverControls" style="display: none;">
             <h4>Uploaded Files:</h4>
-            <ul id="uploadedFilesListReceiver"></ul> <!-- Uploaded files list for receiver -->
-            <button id="downloadAllBtn">Download All</button> <!-- Tombol untuk download semua file -->
+            <ul id="uploadedFilesListReceiver"></ul>
+            <button id="downloadAllBtn">Download All</button>
         </div>
 
-        <!-- Pesan untuk reload halaman -->
         <div id="reloadMessage" style="margin-top: 20px;">
             <p>Reload halaman jika ingin keluar dari sesi.</p>
         </div>
@@ -90,6 +93,20 @@
             document.getElementById('sessionIdDisplay').innerText = id;
             document.getElementById(isUploader ? 'uploaderControls' : 'receiverControls').style.display = 'block';
         }
+
+        // Display connected clients
+        socket.on('updateClientList', (connectedIPs) => {
+            const connectedClients = connectedIPs.length > 0
+                ? connectedIPs.join('; ')
+                : 'Belum ada klien penerima terhubung.';
+            document.getElementById('connectedClients').textContent = connectedClients;
+        });
+
+        // Show session ended alert
+        socket.on('sessionEnded', (message) => {
+            alert(message);
+            location.reload(); // Kembali ke halaman utama
+        });
 
         // Handle file input for uploader
         document.getElementById('fileInput').onchange = (e) => {

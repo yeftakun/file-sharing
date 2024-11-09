@@ -27,10 +27,8 @@ function getLocalIPAddress() {
 // Hapus semua folder sesi di direktori 'uploads' saat server dimulai
 function deleteAllSessions() {
     const uploadDir = path.join(__dirname, 'uploads');
-    // Membaca semua folder di dalam uploads
     fs.readdirSync(uploadDir).forEach((folder) => {
         const folderPath = path.join(uploadDir, folder);
-        // Menghapus folder beserta isinya
         if (fs.lstatSync(folderPath).isDirectory()) {
             fs.rmSync(folderPath, { recursive: true, force: true });
             console.log(`Deleted session folder: ${folderPath}`);
@@ -47,43 +45,43 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const sessions = {};
 
+// Helper to update clients with the list of connected IPs
+function updateClientList(sessionId) {
+    const connectedIPs = sessions[sessionId].clients.map(client => client.ip);
+    io.to(sessionId).emit('updateClientList', connectedIPs);
+}
+
 // Create or join session
 io.on('connection', (socket) => {
     let sessionId = null;
+    const clientIp = socket.handshake.address.replace(/^.*:/, ''); // Mengambil alamat IP klien
 
     socket.on('createSession', (id, callback) => {
         if (sessions[id]) return callback(true);
         sessions[id] = { clients: [], files: [] };
         fs.mkdirSync(path.join(__dirname, 'uploads', id), { recursive: true });
+        sessionId = id;
         socket.join(id);
-        sessionId = id; // Store session ID for later use
         callback(false);
     });
 
     socket.on('joinSession', (id, callback) => {
         if (!sessions[id]) return callback(false);
-        sessions[id].clients.push(socket.id);
+        sessions[id].clients.push({ id: socket.id, ip: clientIp });
         socket.join(id);
-        sessionId = id; // Store session ID for later use
+        sessionId = id;
         callback(true);
-    });
-
-    // Handle client leaving session
-    socket.on('leaveSession', () => {
-        if (sessionId && sessions[sessionId]) {
-            sessions[sessionId].clients = sessions[sessionId].clients.filter(id => id !== socket.id);
-            if (sessions[sessionId].clients.length === 0) {
-                deleteSession(sessionId);
-            }
-        }
+        updateClientList(sessionId); // Perbarui daftar klien setelah bergabung
     });
 
     // Handle client disconnect (close tab or lose connection)
     socket.on('disconnect', () => {
         if (sessionId && sessions[sessionId]) {
-            sessions[sessionId].clients = sessions[sessionId].clients.filter(id => id !== socket.id);
+            sessions[sessionId].clients = sessions[sessionId].clients.filter(client => client.id !== socket.id);
             if (sessions[sessionId].clients.length === 0) {
                 deleteSession(sessionId);
+            } else {
+                updateClientList(sessionId); // Perbarui daftar klien setelah pemutusan
             }
         }
     });
@@ -97,6 +95,10 @@ io.on('connection', (socket) => {
 // Delete session and its files
 function deleteSession(sessionId) {
     if (sessions[sessionId]) {
+        // Kirim alert "Sesi terputus" ke semua klien di sesi tersebut
+        io.to(sessionId).emit('sessionEnded', 'Sesi berakhir karena salah satu klien telah keluar.');
+
+        // Hapus folder dan sesi dari memori server
         fs.rmSync(path.join(__dirname, 'uploads', sessionId), { recursive: true, force: true });
         delete sessions[sessionId];
         console.log(`Session ${sessionId} and its files have been deleted.`);
