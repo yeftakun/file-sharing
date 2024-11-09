@@ -70,6 +70,10 @@ io.on('connection', (socket) => {
         sessions[id].clients.push({ id: socket.id, ip: clientIp });
         socket.join(id);
         sessionId = id;
+        
+        // Send existing files in session to the new client
+        socket.emit('existingFiles', sessions[sessionId].files);
+        
         callback(true);
         updateClientList(sessionId); // Perbarui daftar klien setelah bergabung
     });
@@ -88,6 +92,10 @@ io.on('connection', (socket) => {
 
     // Handle file upload and notify other clients in the session
     socket.on('fileUploaded', (sessionId, fileName) => {
+        // Save file to session files array
+        if (sessions[sessionId]) {
+            sessions[sessionId].files.push(fileName);
+        }
         io.to(sessionId).emit('fileUploaded', { fileName });
     });
 });
@@ -118,6 +126,9 @@ app.post('/upload/:sessionId', (req, res) => {
         file.mv(uploadPath, (err) => {
             if (err) return res.status(500).send(err);
             io.to(sessionId).emit('fileUploaded', { fileName: file.name });
+            
+            // Store uploaded file name in session data
+            sessions[sessionId].files.push(file.name);
         });
     });
     res.send('Files uploaded successfully!');

@@ -5,18 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Transfer Room</title>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script> <!-- JSZip untuk mengompresi file -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <!-- SweetAlert untuk alert yang lebih cantik -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen">
     <div class="bg-white rounded-lg shadow-lg p-8 max-w-lg w-full">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-4 text-center">File Transfer System</h2>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4 text-center">Sharing Files</h2>
         
         <div id="main" class="space-y-4">
-            <button id="createSessionBtn" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Create Session</button>
-            <input type="text" id="sessionInput" placeholder="Enter 6-digit Session ID" class="w-full p-2 border rounded" />
-            <button id="joinSessionBtn" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">Join Session</button>
+            <button id="createSessionBtn" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Kirim</button>
+            <div class="h-4"></div>
+            <input type="text" id="sessionInput" placeholder="Masukan kode sesi untuk menerima file" class="w-full p-2 border rounded" />
+            <button id="joinSessionBtn" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">Terima File</button>
         </div>
 
         <div id="sessionRoom" class="mt-6 hidden">
@@ -70,7 +72,7 @@
             sessionId = Math.floor(100000 + Math.random() * 900000).toString();
             socket.emit('createSession', sessionId, (exists) => {
                 if (exists) {
-                    alert('Session ID conflict. Try again.');
+                    Swal.fire('Error', 'Session ID conflict. Try again.', 'error');
                     return;
                 }
                 isUploader = true;
@@ -83,7 +85,7 @@
             sessionId = document.getElementById('sessionInput').value;
             socket.emit('joinSession', sessionId, (valid) => {
                 if (!valid) {
-                    alert('Invalid session ID.');
+                    Swal.fire('Error', 'Invalid session ID.', 'error');
                     return;
                 }
                 isUploader = false;
@@ -109,8 +111,9 @@
 
         // Show session ended alert
         socket.on('sessionEnded', (message) => {
-            alert(message);
-            location.reload(); // Kembali ke halaman utama
+            Swal.fire('Session Ended', message, 'info').then(() => {
+                location.reload(); // Kembali ke halaman utama
+            });
         });
 
         // Handle file input for uploader
@@ -150,7 +153,7 @@
         // Upload files using XMLHttpRequest to track progress
         document.getElementById('uploadBtn').onclick = () => {
             if (fileList.length === 0) {
-                alert("No files to upload.");
+                Swal.fire('Warning', 'No files to upload.', 'warning');
                 return;
             }
 
@@ -172,12 +175,12 @@
             // When the request completes, reset progress
             xhr.onload = () => {
                 if (xhr.status === 200) {
-                    alert('Files uploaded successfully!');
+                    Swal.fire('Success', 'Files uploaded successfully!', 'success');
                     fileList.length = 0; // Clear file list
                     document.getElementById('fileList').innerHTML = '';
                     resetProgress();
                 } else {
-                    alert('File upload failed');
+                    Swal.fire('Error', 'File upload failed', 'error');
                 }
             };
 
