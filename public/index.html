@@ -3,75 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload File</title>
+    <title>File Transfer Room</title>
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <h2>Upload File to Local Server</h2>
-    <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" name="file" id="file" required>
-        <button type="submit">Upload</button>
-    </form>
+    <h2>File Transfer System</h2>
+    <div id="main">
+        <button id="createSessionBtn">Create Session</button>
+        <input type="text" id="sessionInput" placeholder="Enter 6-digit Session ID">
+        <button id="joinSessionBtn">Join Session</button>
+    </div>
 
-    <script>
-        const form = document.getElementById('uploadForm');
-        form.onsubmit = async (e) => {
-            e.preventDefault();
-            const fileInput = document.getElementById('file');
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+    <div id="sessionRoom" style="display: none;">
+        <h3>Session ID: <span id="sessionIdDisplay"></span></h3>
+        <div id="uploaderControls" style="display: none;">
+            <input type="file" id="fileInput">
+            <button id="addFileBtn">Add File</button>
+            <ul id="fileList"></ul>
+            <button id="uploadBtn">Upload Files</button>
+        </div>
+        <div id="receiverControls" style="display: none;">
+            <h4>Available Files for Download:</h4>
+            <ul id="downloadList"></ul>
+        </div>
+        <button id="leaveSessionBtn">Leave Session</button>
+    </div>
 
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
-                const result = await response.text();
-                alert(result);
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        };
-    </script>
     <script>
         const socket = io();
-    
-        // Mendengarkan notifikasi saat file baru diunggah
+        let sessionId;
+        let isUploader = false;
+        const fileList = [];
+
+        // Handle Create Session
+        document.getElementById('createSessionBtn').onclick = () => {
+            sessionId = Math.floor(100000 + Math.random() * 900000).toString();
+            socket.emit('createSession', sessionId, (exists) => {
+                if (exists) {
+                    alert('Session ID conflict. Try again.');
+                    return;
+                }
+                isUploader = true;
+                enterSession(sessionId);
+            });
+        };
+
+        // Handle Join Session
+        document.getElementById('joinSessionBtn').onclick = () => {
+            sessionId = document.getElementById('sessionInput').value;
+            socket.emit('joinSession', sessionId, (valid) => {
+                if (!valid) {
+                    alert('Invalid session ID.');
+                    return;
+                }
+                isUploader = false;
+                enterSession(sessionId);
+            });
+        };
+
+        // Enter session room
+        function enterSession(id) {
+            document.getElementById('main').style.display = 'none';
+            document.getElementById('sessionRoom').style.display = 'block';
+            document.getElementById('sessionIdDisplay').innerText = id;
+            document.getElementById(isUploader ? 'uploaderControls' : 'receiverControls').style.display = 'block';
+        }
+
+        // Add file to list
+        document.getElementById('addFileBtn').onclick = () => {
+            const file = document.getElementById('fileInput').files[0];
+            if (file) {
+                fileList.push(file);
+                const li = document.createElement('li');
+                li.innerText = file.name;
+                document.getElementById('fileList').appendChild(li);
+            }
+        };
+
+        // Upload files
+        document.getElementById('uploadBtn').onclick = () => {
+            const formData = new FormData();
+            fileList.forEach(file => formData.append('files', file));
+            fetch(`/upload/${sessionId}`, {
+                method: 'POST',
+                body: formData
+            }).then(response => response.text()).then(msg => alert(msg));
+        };
+
+        // Receive uploaded files in real-time
         socket.on('fileUploaded', (data) => {
             const link = document.createElement('a');
-            link.href = data.filePath;
+            link.href = `/uploads/${sessionId}/${data.fileName}`;
             link.download = data.fileName;
             link.textContent = `Download ${data.fileName}`;
-            document.body.appendChild(link);
-            alert(`File baru tersedia: ${data.fileName}`);
+            const li = document.createElement('li');
+            li.appendChild(link);
+            document.getElementById('downloadList').appendChild(li);
         });
+
+        // Handle leave session
+        document.getElementById('leaveSessionBtn').onclick = () => {
+            socket.emit('leaveSession', sessionId, () => {
+                location.reload();
+            });
+        };
     </script>
-    <script>
-        async function fetchFiles() {
-            try {
-                const response = await fetch('/files');
-                const files = await response.json();
-    
-                const filesContainer = document.createElement('div');
-                filesContainer.innerHTML = '<h3>Available Files:</h3>';
-    
-                files.forEach((file) => {
-                    const link = document.createElement('a');
-                    link.href = `/uploads/${file}`;
-                    link.textContent = file;
-                    link.download = file;
-                    filesContainer.appendChild(link);
-                    filesContainer.appendChild(document.createElement('br'));
-                });
-    
-                document.body.appendChild(filesContainer);
-            } catch (error) {
-                console.error('Error fetching files:', error);
-            }
-        }
-    
-        fetchFiles();
-    </script>
-    
-    
 </body>
 </html>
