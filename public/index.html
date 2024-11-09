@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload File</title>
+</head>
+<body>
+    <h2>Upload File to Local Server</h2>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="file" id="file" required>
+        <button type="submit">Upload</button>
+    </form>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('file');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const result = await response.text();
+                alert(result);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        };
+    </script>
+    <script>
+        const socket = io();
+    
+        // Mendengarkan notifikasi saat file baru diunggah
+        socket.on('fileUploaded', (data) => {
+            const link = document.createElement('a');
+            link.href = data.filePath;
+            link.download = data.fileName;
+            link.textContent = `Download ${data.fileName}`;
+            document.body.appendChild(link);
+            alert(`File baru tersedia: ${data.fileName}`);
+        });
+    </script>
+    <script>
+        async function fetchFiles() {
+            try {
+                const response = await fetch('/files');
+                const files = await response.json();
+    
+                const filesContainer = document.createElement('div');
+                filesContainer.innerHTML = '<h3>Available Files:</h3>';
+    
+                files.forEach((file) => {
+                    const link = document.createElement('a');
+                    link.href = `/uploads/${file}`;
+                    link.textContent = file;
+                    link.download = file;
+                    filesContainer.appendChild(link);
+                    filesContainer.appendChild(document.createElement('br'));
+                });
+    
+                document.body.appendChild(filesContainer);
+            } catch (error) {
+                console.error('Error fetching files:', error);
+            }
+        }
+    
+        fetchFiles();
+    </script>
+    
+    
+</body>
+</html>
