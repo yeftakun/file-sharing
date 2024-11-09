@@ -66,7 +66,7 @@
         const fileList = [];
         let totalFiles = 0;
         let uploadedFiles = 0;
-
+    
         // Handle Create Session
         document.getElementById('createSessionBtn').onclick = () => {
             sessionId = Math.floor(100000 + Math.random() * 900000).toString();
@@ -79,7 +79,7 @@
                 enterSession(sessionId);
             });
         };
-
+    
         // Handle Join Session
         document.getElementById('joinSessionBtn').onclick = () => {
             sessionId = document.getElementById('sessionInput').value;
@@ -92,7 +92,7 @@
                 enterSession(sessionId);
             });
         };
-
+    
         // Enter session room
         function enterSession(id) {
             document.getElementById('main').style.display = 'none';
@@ -100,7 +100,7 @@
             document.getElementById('sessionIdDisplay').innerText = id;
             document.getElementById(isUploader ? 'uploaderControls' : 'receiverControls').style.display = 'block';
         }
-
+    
         // Display connected clients
         socket.on('updateClientList', (connectedIPs) => {
             const connectedClients = connectedIPs.length > 0
@@ -108,20 +108,20 @@
                 : 'Belum ada klien penerima terhubung.';
             document.getElementById('connectedClients').textContent = connectedClients;
         });
-
+    
         // Show session ended alert
         socket.on('sessionEnded', (message) => {
             Swal.fire('Session Ended', message, 'info').then(() => {
                 location.reload(); // Kembali ke halaman utama
             });
         });
-
+    
         // Handle file input for uploader
         document.getElementById('fileInput').onchange = (e) => {
             const files = e.target.files;
             totalFiles = files.length;
             uploadedFiles = 0;
-
+    
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 if (!fileList.some(f => f.name === file.name)) {
@@ -131,11 +131,11 @@
                     document.getElementById('fileList').appendChild(li);
                 }
             }
-
+    
             document.getElementById('progressContainer').style.display = 'block';  // Show progress bar
             updateProgress();
         };
-
+    
         // Remove file from list
         function removeFile(fileName) {
             const index = fileList.findIndex(f => f.name === fileName);
@@ -149,20 +149,20 @@
                 }
             }
         }
-
+    
         // Upload files using XMLHttpRequest to track progress
         document.getElementById('uploadBtn').onclick = () => {
             if (fileList.length === 0) {
                 Swal.fire('Warning', 'No files to upload.', 'warning');
                 return;
             }
-
+    
             const formData = new FormData();
             fileList.forEach(file => formData.append('files', file));
-
+    
             const xhr = new XMLHttpRequest();
             xhr.open('POST', `/upload/${sessionId}`, true);
-
+    
             // Track progress
             xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) {
@@ -171,7 +171,7 @@
                     document.getElementById('progressPercentage').innerText = `${percent}%`;
                 }
             };
-
+    
             // When the request completes, reset progress
             xhr.onload = () => {
                 if (xhr.status === 200) {
@@ -183,10 +183,23 @@
                     Swal.fire('Error', 'File upload failed', 'error');
                 }
             };
-
+    
             xhr.send(formData);
         };
-
+    
+        // Receive existing files for new clients joining the session
+        socket.on('existingFiles', (files) => {
+            files.forEach(fileName => {
+                const link = document.createElement('a');
+                link.href = `/uploads/${sessionId}/${fileName}`;
+                link.download = fileName;
+                link.textContent = `Download ${fileName}`;
+                const li = document.createElement('li');
+                li.appendChild(link);
+                document.getElementById('uploadedFilesListReceiver').appendChild(li);
+            });
+        });
+    
         // Receive uploaded files in real-time (for both sender and receiver)
         socket.on('fileUploaded', (data) => {
             const link = document.createElement('a');
@@ -195,7 +208,7 @@
             link.textContent = `Download ${data.fileName}`;
             const li = document.createElement('li');
             li.appendChild(link);
-
+    
             // Update both sender and receiver file lists
             if (isUploader) {
                 document.getElementById('uploadedFilesListSender').appendChild(li); // Sender's uploaded files
@@ -206,7 +219,7 @@
             uploadedFiles++;
             updateProgress();
         });
-
+    
         // Update progress bar and text
         function updateProgress() {
             const percentage = Math.floor((uploadedFiles / totalFiles) * 100);
@@ -214,14 +227,14 @@
             document.getElementById('progressPercentage').innerText = `${percentage}%`;
             document.getElementById('sentFilesCount').innerText = `${uploadedFiles}/${totalFiles} files sent`;
         }
-
+    
         // Reset progress
         function resetProgress() {
             document.getElementById('progressPercentage').innerText = `0%`;
             document.getElementById('sentFilesCount').innerText = `0/0 files sent`;
             document.getElementById('fileProgress').value = 0;
         }
-
+    
         // Download all files as a zip
         document.getElementById('downloadAllBtn').onclick = () => {
             const zip = new JSZip();
@@ -242,7 +255,7 @@
                 });
             });
         };
-
+    
         // Show confirmation before page reload
         window.onbeforeunload = function() {
             return "Sesi akan berakhir jika anda mereload halaman.";
