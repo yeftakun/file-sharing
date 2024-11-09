@@ -6,49 +6,54 @@
     <title>File Transfer Room</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script> <!-- JSZip untuk mengompresi file -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 </head>
-<body>
-    <h2>File Transfer System</h2>
-    <div id="main">
-        <button id="createSessionBtn">Create Session</button>
-        <input type="text" id="sessionInput" placeholder="Enter 6-digit Session ID">
-        <button id="joinSessionBtn">Join Session</button>
-    </div>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="bg-white rounded-lg shadow-lg p-8 max-w-lg w-full">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4 text-center">File Transfer System</h2>
+        
+        <div id="main" class="space-y-4">
+            <button id="createSessionBtn" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Create Session</button>
+            <input type="text" id="sessionInput" placeholder="Enter 6-digit Session ID" class="w-full p-2 border rounded" />
+            <button id="joinSessionBtn" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">Join Session</button>
+        </div>
 
-    <div id="sessionRoom" style="display: none;">
-        <h3>Session ID: <span id="sessionIdDisplay"></span></h3>
+        <div id="sessionRoom" class="mt-6 hidden">
+            <h3 class="text-lg font-medium text-gray-700 mb-2">Session ID: <span id="sessionIdDisplay" class="font-bold"></span></h3>
 
-        <!-- Client Pengirim -->
-        <div id="uploaderControls" style="display: none;">
-            <input type="file" id="fileInput" multiple>
-            <ul id="fileList"></ul>
-            <button id="uploadBtn">Upload Files</button>
+            <div id="uploaderControls" class="hidden space-y-4">
+                <div class="relative flex items-center justify-center w-full">
+                    <label for="fileInput" class="cursor-pointer flex items-center justify-center w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+                        <i class="bx bx-upload mr-2 text-xl"></i> 
+                        <span>Pilih File</span>
+                    </label>
+                    <input type="file" id="fileInput" multiple class="hidden">
+                </div>                
+                <ul id="fileList" class="list-disc ml-5 text-gray-600"></ul>
+                <button id="uploadBtn" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Upload Files</button>
+                <h4 class="text-sm text-gray-700 font-medium">Terhubung dengan:</h4>
+                <p id="connectedClients" class="text-sm text-gray-600">Belum ada klien penerima terhubung.</p>
 
-            <!-- Daftar Klien Terhubung -->
-            <h4>Terhubung dengan:</h4>
-            <p id="connectedClients">Belum ada klien penerima terhubung.</p>
+                <div id="progressContainer" class="hidden space-y-1">
+                    <label class="text-sm text-gray-600">Progress: <span id="progressPercentage">0%</span></label>
+                    <progress id="fileProgress" class="w-full h-1" value="0" max="100"></progress>
+                    <span id="sentFilesCount" class="text-sm text-gray-600">0/0 files sent</span>
+                </div>
 
-            <!-- Progress Bar -->
-            <div id="progressContainer" style="display: none;">
-                <label>Progress: <span id="progressPercentage">0%</span></label><br>
-                <progress id="fileProgress" value="0" max="100"></progress><br>
-                <span id="sentFilesCount">0/0 files sent</span>
+                <h4 class="text-sm text-gray-700 font-medium">Uploaded Files:</h4>
+                <ul id="uploadedFilesListSender" class="list-disc ml-5 text-gray-600"></ul>
             </div>
 
-            <!-- Uploaded Files for the Sender -->
-            <h4>Uploaded Files:</h4>
-            <ul id="uploadedFilesListSender"></ul>
-        </div>
+            <div id="receiverControls" class="hidden space-y-4">
+                <h4 class="text-sm text-gray-700 font-medium">Uploaded Files:</h4>
+                <ul id="uploadedFilesListReceiver" class="list-disc ml-5 text-gray-600"></ul>
+                <button id="downloadAllBtn" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">Download All</button>
+            </div>
 
-        <!-- Client Penerima -->
-        <div id="receiverControls" style="display: none;">
-            <h4>Uploaded Files:</h4>
-            <ul id="uploadedFilesListReceiver"></ul>
-            <button id="downloadAllBtn">Download All</button>
-        </div>
-
-        <div id="reloadMessage" style="margin-top: 20px;">
-            <p>Reload halaman jika ingin keluar dari sesi.</p>
+            <div id="reloadMessage" class="mt-6 text-sm text-gray-500">
+                <p>Reload halaman jika ingin keluar dari sesi.</p>
+            </div>
         </div>
     </div>
 
