@@ -7,7 +7,7 @@
 
 
 ```sh
-https://github.com/yeftakun/file-sharing
+git clone https://github.com/yeftakun/file-sharing
 cd file-sharing
 npm install
 ```
