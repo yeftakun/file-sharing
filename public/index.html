@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Transfer Room</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script> <!-- JSZip untuk mengompresi file -->
 </head>
 <body>
     <h2>File Transfer System</h2>
@@ -16,17 +17,36 @@
 
     <div id="sessionRoom" style="display: none;">
         <h3>Session ID: <span id="sessionIdDisplay"></span></h3>
+
+        <!-- Client Pengirim -->
         <div id="uploaderControls" style="display: none;">
-            <input type="file" id="fileInput">
-            <button id="addFileBtn">Add File</button>
+            <input type="file" id="fileInput" multiple>
             <ul id="fileList"></ul>
             <button id="uploadBtn">Upload Files</button>
+
+            <!-- Progress Bar -->
+            <div id="progressContainer" style="display: none;">
+                <label>Progress: <span id="progressPercentage">0%</span></label><br>
+                <progress id="fileProgress" value="0" max="100"></progress><br>
+                <span id="sentFilesCount">0/0 files sent</span>
+            </div>
+
+            <!-- Uploaded Files for the Sender -->
+            <h4>Uploaded Files:</h4>
+            <ul id="uploadedFilesListSender"></ul> <!-- Uploaded files list for sender -->
         </div>
+
+        <!-- Client Penerima -->
         <div id="receiverControls" style="display: none;">
-            <h4>Available Files for Download:</h4>
-            <ul id="downloadList"></ul>
+            <h4>Uploaded Files:</h4>
+            <ul id="uploadedFilesListReceiver"></ul> <!-- Uploaded files list for receiver -->
+            <button id="downloadAllBtn">Download All</button> <!-- Tombol untuk download semua file -->
         </div>
-        <button id="leaveSessionBtn">Leave Session</button>
+
+        <!-- Pesan untuk reload halaman -->
+        <div id="reloadMessage" style="margin-top: 20px;">
+            <p>Reload halaman jika ingin keluar dari sesi.</p>
+        </div>
     </div>
 
     <script>
@@ -34,6 +54,8 @@
         let sessionId;
         let isUploader = false;
         const fileList = [];
+        let totalFiles = 0;
+        let uploadedFiles = 0;
 
         // Handle Create Session
         document.getElementById('createSessionBtn').onclick = () => {
@@ -69,28 +91,78 @@
             document.getElementById(isUploader ? 'uploaderControls' : 'receiverControls').style.display = 'block';
         }
 
-        // Add file to list
-        document.getElementById('addFileBtn').onclick = () => {
-            const file = document.getElementById('fileInput').files[0];
-            if (file) {
-                fileList.push(file);
-                const li = document.createElement('li');
-                li.innerText = file.name;
-                document.getElementById('fileList').appendChild(li);
+        // Handle file input for uploader
+        document.getElementById('fileInput').onchange = (e) => {
+            const files = e.target.files;
+            totalFiles = files.length;
+            uploadedFiles = 0;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!fileList.some(f => f.name === file.name)) {
+                    fileList.push(file);
+                    const li = document.createElement('li');
+                    li.innerHTML = `${file.name} <button onclick="removeFile('${file.name}')">Remove</button>`;
+                    document.getElementById('fileList').appendChild(li);
+                }
             }
+
+            document.getElementById('progressContainer').style.display = 'block';  // Show progress bar
+            updateProgress();
         };
 
-        // Upload files
+        // Remove file from list
+        function removeFile(fileName) {
+            const index = fileList.findIndex(f => f.name === fileName);
+            if (index !== -1) {
+                fileList.splice(index, 1);
+                const fileListItems = document.getElementById('fileList').getElementsByTagName('li');
+                for (let i = 0; i < fileListItems.length; i++) {
+                    if (fileListItems[i].innerText.includes(fileName)) {
+                        fileListItems[i].remove();
+                    }
+                }
+            }
+        }
+
+        // Upload files using XMLHttpRequest to track progress
         document.getElementById('uploadBtn').onclick = () => {
+            if (fileList.length === 0) {
+                alert("No files to upload.");
+                return;
+            }
+
             const formData = new FormData();
             fileList.forEach(file => formData.append('files', file));
-            fetch(`/upload/${sessionId}`, {
-                method: 'POST',
-                body: formData
-            }).then(response => response.text()).then(msg => alert(msg));
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `/upload/${sessionId}`, true);
+
+            // Track progress
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    document.getElementById('fileProgress').value = percent;
+                    document.getElementById('progressPercentage').innerText = `${percent}%`;
+                }
+            };
+
+            // When the request completes, reset progress
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    alert('Files uploaded successfully!');
+                    fileList.length = 0; // Clear file list
+                    document.getElementById('fileList').innerHTML = '';
+                    resetProgress();
+                } else {
+                    alert('File upload failed');
+                }
+            };
+
+            xhr.send(formData);
         };
 
-        // Receive uploaded files in real-time
+        // Receive uploaded files in real-time (for both sender and receiver)
         socket.on('fileUploaded', (data) => {
             const link = document.createElement('a');
             link.href = `/uploads/${sessionId}/${data.fileName}`;
@@ -98,14 +170,57 @@
             link.textContent = `Download ${data.fileName}`;
             const li = document.createElement('li');
             li.appendChild(link);
-            document.getElementById('downloadList').appendChild(li);
+
+            // Update both sender and receiver file lists
+            if (isUploader) {
+                document.getElementById('uploadedFilesListSender').appendChild(li); // Sender's uploaded files
+            } else {
+                document.getElementById('uploadedFilesListReceiver').appendChild(li); // Receiver's uploaded files
+            }
+            
+            uploadedFiles++;
+            updateProgress();
         });
 
-        // Handle leave session
-        document.getElementById('leaveSessionBtn').onclick = () => {
-            socket.emit('leaveSession', sessionId, () => {
-                location.reload();
+        // Update progress bar and text
+        function updateProgress() {
+            const percentage = Math.floor((uploadedFiles / totalFiles) * 100);
+            document.getElementById('fileProgress').value = percentage;
+            document.getElementById('progressPercentage').innerText = `${percentage}%`;
+            document.getElementById('sentFilesCount').innerText = `${uploadedFiles}/${totalFiles} files sent`;
+        }
+
+        // Reset progress
+        function resetProgress() {
+            document.getElementById('progressPercentage').innerText = `0%`;
+            document.getElementById('sentFilesCount').innerText = `0/0 files sent`;
+            document.getElementById('fileProgress').value = 0;
+        }
+
+        // Download all files as a zip
+        document.getElementById('downloadAllBtn').onclick = () => {
+            const zip = new JSZip();
+            const files = document.getElementById('uploadedFilesListReceiver').getElementsByTagName('li');
+            Array.from(files).forEach((fileItem, index) => {
+                const fileName = fileItem.innerText.replace('Download ', '');
+                const fileUrl = `/uploads/${sessionId}/${fileName}`;
+                fetch(fileUrl).then(response => response.blob()).then(blob => {
+                    zip.file(fileName, blob);
+                    if (index === files.length - 1) {
+                        zip.generateAsync({ type: 'blob' }).then(function(content) {
+                            const a = document.createElement('a');
+                            a.href = URL.createObjectURL(content);
+                            a.download = 'all_files.zip';
+                            a.click();
+                        });
+                    }
+                });
             });
+        };
+
+        // Show confirmation before page reload
+        window.onbeforeunload = function() {
+            return "Sesi akan berakhir jika anda mereload halaman.";
         };
     </script>
 </body>
